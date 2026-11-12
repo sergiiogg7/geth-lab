@@ -1,6 +1,5 @@
-# UNTESTED HERE: Docker is not available on the author's machine. The scrape path and
-# metric names were verified against a real geth 1.17.10 node (docs/METRICS.md);
-# the Prometheus/Grafana containers themselves were never started.
+# Docker variant of the Prometheus config (targets host.docker.internal). The native variant (scripts/observability-up.sh) is generated from
+# this file family and was verified against Prometheus 3.16.0 (docs/OBSERVABILITY.md); this Docker path itself is UNTESTED (no Docker here).
 global:
   scrape_interval: 5s
   evaluation_interval: 5s

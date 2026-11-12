@@ -33,7 +33,7 @@ as `chain_head_block`.
 | Metric | Type | Why you care |
 |---|---|---|
 | `chain_head_block` | gauge | Height of the executed head. Flat for N periods = block production or import stalled (alert `NoNewBlocks`). |
-| `chain_head_header` | gauge | Highest known header. **`header - block` > 0 for a while means headers are known but the state is not**: exactly what an unclean shutdown leaves behind (C1). Alert `HeadStateBehindHeader`. |
+| `chain_head_header` | gauge | Highest known header. `header - block` > 0 for a while means headers are known but the state is not (alert `HeadStateBehindHeader`). Measured caveat: after the C1 `kill -9` rewind the header gauge fell together with the block gauge (13 to 1 both), so this gap did **not** appear; use `HeadWentBackwards` for that. |
 | `chain_head_safe`, `chain_head_finalized`, `chain_head_receipt` | gauge | Fork-choice markers. In `--dev` the beacon finalizes every 32nd block (`devEpochLength`), so it is `0` for the first 31 blocks. |
 | `chain_inserts` (+`_count`) | summary | Time to insert a block (validate + execute + write), ns. p99 climbing = slow disk or heavy blocks. |
 | `chain_execution`, `chain_validation`, `chain_write`, `chain_crossvalidation` (+`_count`) | summary | The insert time broken down: EVM execution, header/body validation, database write. |
@@ -51,10 +51,10 @@ as `chain_head_block`.
 | `txpool_queued` | gauge | Transactions with a nonce gap. A growing queue with flat pending = clients sending out of order. |
 | `txpool_pending_accounts`, `txpool_queued_accounts` | gauge | Distinct senders. |
 | `txpool_valid`, `txpool_invalid`, `txpool_known` | gauge (counter-like) | Accepted, rejected, duplicate submissions. |
-| `txpool_underpriced`, `txpool_overflowed` | gauge (counter-like) | **Transactions dropped because the pool was full or the price was too low.** In C3 a client got 1600 transaction hashes back and `txpool_underpriced` grew by 2816 while only 192 were mined: the pool accepts, then evicts silently. Alert `TxPoolDroppingTransactions`. |
+| `txpool_underpriced`, `txpool_overflowed` | gauge (counter-like) | **Rejection attempts because the pool was full or the price was too low, including the local tracker's retries.** In C3 a client got 1600 transaction hashes back, `txpool_underpriced` grew by 2816 and only 192 were mined in the first 12 s: the RPC layer swallowed the rejections and the tracker retried them (the postmortem corrects an earlier "silent eviction" reading). Alert `TxPoolDroppingTransactions`. |
 | `txpool_pending_ratelimit`, `txpool_queued_ratelimit` | gauge | Per-account cap hits (`accountslots`, `accountqueue`). |
 | `txpool_pending_discard`, `txpool_pending_replace`, `txpool_queued_discard`, `txpool_queued_replace`, `txpool_queued_eviction`, `txpool_pending_nofunds`, `txpool_queued_nofunds` | gauge | The reasons behind removals and replacements. |
-| `txpool_local` | gauge | Number of local (RPC-submitted) transactions tracked and journaled. |
+| `txpool_local` | gauge | Number of RPC-submitted transactions the **local tracker** holds (and journals). If it is larger than `txpool_pending + txpool_queued`, the node told clients "accepted" for transactions the pool refused and will retry them once a minute (C3; 1,600 after the C3 flood, 1,472 then 1,408 as they were mined). Alert `TxPoolTrackerBacklog`. |
 | `txpool_slots`, `txpool_throttle`, `txpool_reservations_0` | gauge | Slot usage and throttling. |
 | `txpool_reorgtime` (+`_count`), `txpool_reheap`, `txpool_dropbetweenreorg` | summary | Cost of resetting the pool on a new head. |
 | `blobpool_*` (16 families) | gauge | Same for blob transactions. |
@@ -99,8 +99,9 @@ as `chain_head_block`.
 
 ## Alert rules built on these names
 
-`monitoring/prometheus/alerts.yml`: `GethDown`, `NoNewBlocks`, `HeadStateBehindHeader`, `TxPoolBacklog`,
-`TxPoolDroppingTransactions`, `ChainReorg`, `RpcErrorRatioHigh`, `MemoryHigh`, `NoPeers`. **Untested:** Docker is not available on the
-author's machine, so Prometheus and Grafana were never started and `promtool check rules` was not run. Only the metric names
-and the scrape path are verified. Without them, `bin/watch -serve 127.0.0.1:8081` gives a status page and `scripts/metrics-scrape.sh`
-a quick text view.
+`monitoring/prometheus/alerts.yml` (11 rules): `GethDown`, `NoNewBlocks`, `HeadWentBackwards`, `HeadStateBehindHeader`, `TxPoolBacklog`,
+`TxPoolDroppingTransactions`, `TxPoolTrackerBacklog`, `ChainReorg`, `RpcErrorRatioHigh`, `MemoryHigh`, `NoPeers`. They were run natively against Prometheus 3.16.0 on 2026-11-12
+(`promtool check rules`, `/api/v1/rules`, and controlled failures that drove `GethDown`, `NoNewBlocks`, `HeadWentBackwards` and `TxPoolDroppingTransactions` to `firing`; see
+[OBSERVABILITY.md](OBSERVABILITY.md)). Two facts from those runs changed this catalogue: after a `kill -9` wedge `chain_head_header` fell together with `chain_head_block`, so
+`HeadStateBehindHeader` does **not** detect it (`HeadWentBackwards` does); and `txpool_local` (the local-transaction tracker, see C3) is the number that exposes "accepted but not in the pool".
+The Docker Compose file is still untested. Without Prometheus, `bin/watch -serve 127.0.0.1:8081` gives a status page and `scripts/metrics-scrape.sh` a quick text view.

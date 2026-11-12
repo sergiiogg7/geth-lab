@@ -1,0 +1,62 @@
+# obscheck after adding panel 8 and the 11 rules; date 2026-11-12T17:54:50Z; node under the C3 flood
+== Prometheus targets
+PASS  1 active target(s)
+PASS  job=geth instance=dev-node http://127.0.0.1:56060/debug/metrics/prometheus health=up 
+PASS  dashboard monitoring/grafana/dashboards/geth.json: 17 panel queries
+== Dashboard queries straight from Prometheus
+PASS  Head block                                    chain_head_block                                 series=1 first=39 
+PASS  Head block vs header (gap after unclean shutd chain_head_block                                 series=1 first=39 
+PASS  Head block vs header (gap after unclean shutd chain_head_header                                series=1 first=39 
+PASS  TxPool pending / queued                       txpool_pending                                   series=1 first=0 
+PASS  TxPool pending / queued                       txpool_queued                                    series=1 first=0 
+PASS  TxPool discards (rate / s)                    rate(txpool_underpriced[1m])                     series=1 first=24.436363636363634 
+PASS  TxPool discards (rate / s)                    rate(txpool_overflowed[1m])                      series=1 first=0 
+PASS  TxPool discards (rate / s)                    rate(txpool_pending_ratelimit[1m])               series=1 first=1.1799469696969698 
+PASS  TxPool discards (rate / s)                    rate(txpool_queued_ratelimit[1m])                series=1 first=0 
+PASS  Block insert time (chain_inserts, ns)         chain_inserts{quantile="0.5"}                    series=1 first=2001101 
+PASS  Block insert time (chain_inserts, ns)         chain_inserts{quantile="0.99"}                   series=1 first=2001101 
+PASS  JSON-RPC requests / failures (rate)           rate(rpc_requests[1m])                           series=1 first=0 
+PASS  JSON-RPC requests / failures (rate)           rate(rpc_failure[1m])                            series=1 first=0 
+PASS  Process memory (bytes)                        system_memory_used                               series=1 first=60145288 
+PASS  Process memory (bytes)                        system_memory_held                               series=1 first=126273784 
+PASS  Local tracker backlog (txpool_local): accepte txpool_local                                     series=1 first=1472 
+PASS  Local tracker backlog (txpool_local): accepte txpool_pending + txpool_queued                   series=1 first=0 
+== Alert rules
+PASS  11 alerting rules loaded
+PASS  GethDown                     health=ok state=inactive active=0
+PASS  NoNewBlocks                  health=ok state=inactive active=0
+PASS  HeadWentBackwards            health=ok state=inactive active=0
+PASS  HeadStateBehindHeader        health=ok state=inactive active=0
+PASS  TxPoolBacklog                health=ok state=inactive active=0
+PASS  TxPoolDroppingTransactions   health=ok state=firing active=1
+PASS  TxPoolTrackerBacklog         health=ok state=firing active=1
+PASS  ChainReorg                   health=ok state=inactive active=0
+PASS  RpcErrorRatioHigh            health=ok state=inactive active=0
+PASS  MemoryHigh                   health=ok state=inactive active=0
+PASS  NoPeers                      health=ok state=inactive active=0
+== Grafana
+PASS  Grafana 13.3.1 database=ok
+PASS  datasource provisioned: name=Prometheus uid=prometheus type=prometheus url=http://127.0.0.1:59090
+PASS  datasource uid=prometheus present
+PASS  dashboard provisioned: "geth-lab: node overview" uid=geth-lab-overview folder=geth-lab
+PASS  dashboard uid=geth-lab-overview present
+== Dashboard queries through Grafana (/api/ds/query)
+PASS  Head block                                    chain_head_block                                 frames=1 
+PASS  Head block vs header (gap after unclean shutd chain_head_block                                 frames=1 
+PASS  Head block vs header (gap after unclean shutd chain_head_header                                frames=1 
+PASS  TxPool pending / queued                       txpool_pending                                   frames=1 
+PASS  TxPool pending / queued                       txpool_queued                                    frames=1 
+PASS  TxPool discards (rate / s)                    rate(txpool_underpriced[1m])                     frames=1 
+PASS  TxPool discards (rate / s)                    rate(txpool_overflowed[1m])                      frames=1 
+PASS  TxPool discards (rate / s)                    rate(txpool_pending_ratelimit[1m])               frames=1 
+PASS  TxPool discards (rate / s)                    rate(txpool_queued_ratelimit[1m])                frames=1 
+PASS  Block insert time (chain_inserts, ns)         chain_inserts{quantile="0.5"}                    frames=1 
+PASS  Block insert time (chain_inserts, ns)         chain_inserts{quantile="0.99"}                   frames=1 
+PASS  JSON-RPC requests / failures (rate)           rate(rpc_requests[1m])                           frames=1 
+PASS  JSON-RPC requests / failures (rate)           rate(rpc_failure[1m])                            frames=1 
+PASS  Process memory (bytes)                        system_memory_used                               frames=1 
+PASS  Process memory (bytes)                        system_memory_held                               frames=1 
+PASS  Local tracker backlog (txpool_local): accepte txpool_local                                     frames=1 
+PASS  Local tracker backlog (txpool_local): accepte txpool_pending + txpool_queued                   frames=1 
+
+all checks passed

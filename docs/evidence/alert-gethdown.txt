@@ -1,0 +1,11 @@
+# Controlled failure: hard-kill the node by pid, watch alert GethDown (for: 30s, scrape 5s)
+# date: 2026-11-12T17:17:17Z
+17:17:17  alert GethDown: ? -> inactive
+17:17:30  alert GethDown: inactive -> pending
+17:18:00  alert GethDown: pending -> firing
+
+# GET /api/v1/alerts afterwards
+{"status":"success","data":{"alerts":[{"labels":{"alertname":"GethDown","instance":"dev-node","job":"geth","severity":"critical"},"annotations":{"runbook":"docs/RUNBOOK.md#alert-gethdown","summary":"geth metrics endpoint is down"},"state":"firing","activeAt":"2026-11-12T17:17:29.813147797Z","value":"0e+00"}]}}
+
+# up{job=geth} history (query_range, step 15s)
+{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"__name__":"up","instance":"dev-node","job":"geth"},"values":[[1794503785,"1"],[1794503800,"1"],[1794503815,"1"],[1794503830,"1"],[1794503845,"1"],[1794503860,"0"],[1794503875,"0"],[1794503890,"0"],[1794503905,"0"]]}]}}

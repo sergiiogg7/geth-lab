@@ -1,0 +1,13 @@
+# Controlled failure 2: persistent node under load, kill -9, restart (C1 wedge). Watching NoNewBlocks and HeadStateBehindHeader.
+# kill at 17:18:46Z, node restarted at once; chain_head_block was 13 before the kill and 1 after (Prometheus); chain_head_header followed it (also 1)
+# date: 2026-11-12T17:19:02Z
+17:19:03  alert NoNewBlocks: ? -> inactive
+17:20:50  alert NoNewBlocks: inactive -> pending
+17:22:50  alert NoNewBlocks: pending -> firing
+
+# chain_head_block and chain_head_header around the kill (query_range, step 5s, from 17:18:30Z)
+chain_head_block
+"values":[[1794503920,"3"],[1794503925,"8"],[1794503930,"13"],[1794503935,"1"],[1794503940,"1"],[1794503945,"1"],[1794503950,"1"],[1794503955,"1"],[1794503960,"1"]]}]}}
+chain_head_header
+"values":[[1794503920,"3"],[1794503925,"8"],[1794503930,"13"],[1794503935,"1"],[1794503940,"1"],[1794503945,"1"],[1794503950,"1"],[1794503955,"1"],[1794503960,"1"]]}]}}
+# HeadStateBehindHeader never left 'inactive': header and block heads were equal after the wedge.

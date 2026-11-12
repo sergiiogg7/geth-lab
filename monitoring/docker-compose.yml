@@ -1,4 +1,4 @@
-# UNTESTED: written for Docker Desktop / Linux Docker; the author's machine has no Docker.
+# UNTESTED Docker path: written for Docker Desktop or Linux Docker; the author machine has no Docker. The native, verified way is scripts/observability-up.sh.
 # Run the node on the host first (scripts/start-node.sh), then:
 #   docker compose -f monitoring/docker-compose.yml up
 services:

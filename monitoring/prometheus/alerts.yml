@@ -22,8 +22,19 @@ groups:
           summary: "head block did not move for 2 minutes"
           runbook: "docs/RUNBOOK.md#alert-nonewblocks"
 
+      - alert: HeadWentBackwards
+        # The signature of the C1 wedge, measured: after kill -9 of a persistent dev node chain_head_block fell from 13 to 1
+        # (docs/evidence/alert-c1-wedge.txt). Also fires on purpose-made rewinds (debug_setHead, lab_fork).
+        expr: chain_head_block - max_over_time(chain_head_block[5m]) < 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "block head is lower than it was within the last 5 minutes (rewind)"
+          runbook: "docs/RUNBOOK.md#alert-headwentbackwards"
+
       - alert: HeadStateBehindHeader
-        # After an unclean shutdown geth keeps the header chain but rewinds the block head (see C1 postmortem).
+        # Header head ahead of the block head: seen during snap sync. It did NOT fire in the C1 wedge: the measured
+        # chain_head_header fell together with chain_head_block (docs/evidence/alert-c1-wedge.txt).
         expr: chain_head_header - chain_head_block > 3
         for: 1m
         labels: {severity: critical}
@@ -48,6 +59,16 @@ groups:
         annotations:
           summary: "pool is discarding transactions (see C3 postmortem: accepted txs can vanish silently)"
           runbook: "docs/RUNBOOK.md#alert-txpooldroppingtransactions"
+
+      - alert: TxPoolTrackerBacklog
+        # C3 root cause: RPC-submitted txs the pool refused are held by the local tracker and retried once a minute.
+        # txpool_local counts tracked txs; the pool holds pending + queued. A big gap = clients were told "accepted" but the pool has not got them.
+        expr: txpool_local - (txpool_pending + txpool_queued) > 100
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "more than 100 accepted transactions are waiting in the local tracker, not in the pool (C3)"
+          runbook: "docs/RUNBOOK.md#alert-txpooltrackerbacklog"
 
       - alert: ChainReorg
         expr: increase(chain_reorg_drop[10m]) > 0

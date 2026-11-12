@@ -1,0 +1,3 @@
+# TxPoolTrackerBacklog drill (C3 flood), watch until firing; date 2026-11-12T17:53:50Z
+17:53:51  alert TxPoolTrackerBacklog: ? -> pending
+17:54:50  alert TxPoolTrackerBacklog: pending -> firing

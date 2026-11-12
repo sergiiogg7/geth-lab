@@ -1,0 +1,16 @@
+# Controlled failure 3: same wedge, new alert HeadWentBackwards (rule: chain_head_block - max_over_time(chain_head_block[5m]) < 0, for 0m)
+# date: 2026-11-12T17:24:50Z
+17:24:50  alert HeadWentBackwards: ? -> inactive
+17:25:30  alert HeadWentBackwards: inactive -> firing
+
+17:25:34  head after restart: 11
+
+# Outcome of this run (it did NOT wedge): head 55 before the kill, 0 after the rewind, then the 809 journaled txs were re-injected and the chain grew again: 11, 14, 19, 44.
+# Node log excerpt (restart):
+INFO [11-12|17:25:24.520] Loaded most recent local block           number=51 hash=3cb62d..a79c1c age=7s
+INFO [11-12|17:25:24.520] Loaded most recent local finalized block number=32 hash=bb9d22..5a08aa age=26s
+WARN [11-12|17:25:24.520] Head state missing, repairing            number=51 hash=3cb62d..a79c1c
+INFO [11-12|17:25:24.554] Loaded most recent local block           number=0  hash=790ac2..86d6ad age=57y8mo1w
+INFO [11-12|17:25:24.571] Enabled full-sync                        head=0 hash=790ac2..86d6ad
+WARN [11-12|17:25:24.571] Unclean shutdown detected                booted=2026-11-12T17:24:27+0000 age=57s
+INFO [11-12|17:25:24.824] Loaded local transaction journal         transactions=809 dropped=0
