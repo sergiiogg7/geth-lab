@@ -1,6 +1,6 @@
 # Contribution track (research only)
 
-**Status: nothing has been posted, claimed, forked or opened.** Everything below is reading and proposals that need the
+**Status: nothing has been posted, claimed, forked or opened.** The #28222 study (`docs/upstream/`, with a reproduction recipe and a draft comment, both unposted and unrun) is finished. Everything below is reading and proposals that need the
 owner's explicit go. Checked on 2026-11-12 against the public GitHub API (read-only calls) and the v1.17.10 source.
 
 ## 1. The rules of go-ethereum, as written
@@ -54,7 +54,7 @@ reason="snap-sync incomplete"` and `eth/catalyst/api.go:1095` ignores every payl
 ("Ignoring payload while snap syncing"). The chain accepts one block and then never advances. The closest existing issue is
 **#28222** "Geth should handle genesis block with default syncmode" (open, labelled help wanted), which has two open
 fix PRs: #36037 (`eth/catalyst: permit payload import when parent state is local and disable snapsync at genesis`) and #35567
-(`eth/downloader: switch to full sync when progressing past genesis`). Whether they fix the dev-node crash case is untested.
+(`eth/downloader: switch to full sync when progressing past genesis`). Whether they fix the dev-node crash case is untested; they were read in full, diff by diff, in [docs/upstream/](upstream/README.md) (reasoning only, nothing built or run). Note: #28222 itself is about snap sync at genesis, not `kill -9`; the lab reaches the same stuck state by a different road.
 Useful, honest next steps (each needs the owner's go): build one of those PR branches locally and re-run
 `go test -tags chaos -run TestC1 ./test/chaos` against it; then comment on #28222 with the reproduction and the result.
 The reproduction is one command: `scripts/demo.sh` section 7, or the C1 test.
@@ -67,7 +67,7 @@ closing race" (assigned).
 
 * `--dev.period` help text says "0 = mine only if transaction pending", but `SimulatedBeacon.Start` does nothing for period 0 (`eth/catalyst/simulated_beacon.go:157`); on-demand mining is implemented in the API constructor `newSimulatedBeaconAPI` (`simulated_beacon_api.go:35`). The behaviour is right, the code placement is surprising.
 * The dev banner says "Starting Geth on Ethereum mainnet..." in dev mode (cosmetic).
-* RPC-submitted transactions are accepted (hash returned) and then silently evicted when the pool is full (C3): worth a docs note on `--txpool.*` or on `eth_sendRawTransaction`.
+* RPC-submitted transactions that the pool refuses are swallowed by `SendTx` and retried by the local tracker once a minute (C3, confirmed by C3b); the `--txpool.nolocals` help text does not mention that it also changes what clients are told. Worth a docs note on `--txpool.*` or `eth_sendRawTransaction`.
 * `debug_setHead` followed by new dev blocks looks like a reorg to followers (C5): fine, but not documented for dev mode.
 * A fresh node answers receipt lookups with `-32000 transaction indexing is in progress` for a short time after start (found by `scripts/smoke.sh`).
 

@@ -35,7 +35,7 @@ go test -tags chaos -count=1 -v -timeout 20m ./test/chaos  # all scenarios, ~6 m
 * `cmd/loadgen`, `cmd/watch`, `cmd/labnode`, `cmd/nodectl`: binaries. `internal/*`: the logic (devnet helpers, loadgen engine,
   chainwatch reorg tracker, gasprofile tracer, labapi RPC namespace, nodeproc process harness).
 * `test/chaos` (build tag `chaos`), `test/e2e` (tag `e2e`): tests that start real processes.
-* `monitoring/` (untested), `docs/` (NODE-OPS, METRICS, RUNBOOK, geth-code-tour, CONTRIBUTIONS, DEMO, TOOLCHAIN, postmortems/).
+* `monitoring/` (verified natively, `scripts/observability-up.sh`), `cmd/obscheck`, `docs/` (NODE-OPS, METRICS, RUNBOOK, geth-code-tour, CONTRIBUTIONS, DEMO, TOOLCHAIN, postmortems/).
 
 ## Conventions
 

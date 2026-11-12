@@ -1,13 +1,17 @@
 # geth-lab
 
+[![ci](https://github.com/sergiiogg7/geth-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiiogg7/geth-lab/actions/workflows/ci.yml)
+[![chaos](https://github.com/sergiiogg7/geth-lab/actions/workflows/chaos.yml/badge.svg)](https://github.com/sergiiogg7/geth-lab/actions/workflows/chaos.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A hands-on lab around **Geth** (go-ethereum, the most widely used Ethereum execution client, written in Go): operate it, extend it with Go code,
 break it on purpose, and write down what happened. Built to be cloned, run in minutes and read.
 
-* **Operate:** scripts to start, stop, kill, reset and smoke-test a `geth --dev` node, Prometheus metrics catalogue from a real scrape, runbook.
+* **Operate:** scripts to start, stop, kill, reset and smoke-test a `geth --dev` node, Prometheus metrics catalogue from a real scrape, runbook. Prometheus and Grafana run natively (no Docker) and are verified through their APIs, with alerts driven to firing by real failures (`docs/OBSERVABILITY.md`).
 * **Extend (Go):** `labnode`, a binary that embeds Geth **as a library** and adds a custom `lab_` JSON-RPC namespace and a native EVM tracer built on
   `core/tracing` hooks. `loadgen`, a transaction flood with latency percentiles and txpool behaviour. `watch`, a head follower that detects reorgs, rewinds, stalls and RPC outages.
-* **Break:** six automated failure scenarios on real node processes (kill -9 under load, graceful vs hard stop, txpool overflow, storage-flag changes,
-  rewind/reorg, RPC abuse), each with a written postmortem that quotes numbers from the run.
+* **Break:** seven automated failure scenarios on real node processes (kill -9 under load, graceful vs hard stop, txpool overflow, storage-flag changes,
+  rewind/reorg, RPC abuse, a memory-capped node), each with a written postmortem that quotes numbers from the run.
 * **Read:** a source tour of go-ethereum v1.17.10 with verified file and line anchors, and a research note for an upstream contribution track.
 
 Not a product, not audited, test keys only (see [SECURITY.md](SECURITY.md)). One node only: Geth no longer supports multi-node PoA private networks, and a
@@ -38,7 +42,7 @@ Stop with `scripts/stop-node.sh`. Output of a real demo run: [docs/DEMO.md](docs
                                     test/chaos   internal/nodeproc            |     node.New + eth.New + SimulatedBeacon
                                     test/e2e                                  |     + internal/labapi  -> lab_* namespace
                                                                               |     + internal/gasprofile -> "gasProfile" tracer
-  monitoring/ (Prometheus, Grafana, alerts: untested)  <---- /debug/metrics/prometheus (port 6060)
+  monitoring/ (Prometheus, Grafana, alerts: verified natively)  <---- /debug/metrics/prometheus (port 6060)
 ```
 
 `geth --dev` runs a post-Merge chain with a built-in *simulated beacon* (a fake consensus client), a prefunded account and no networking. `labnode` is the same
@@ -63,33 +67,33 @@ thing assembled by hand in about 150 lines, plus the lab's extensions. Both acce
 |---|---|
 | C1 kill -9 under load | `geth --dev --datadir` does **not** survive it: head 5 to 0, 1,648 mined txs gone, block production stuck in snap-sync mode; RPC still answers in 0.5 s. `--gcmode archive --state.scheme hash` loses nothing. |
 | C2 graceful vs kill | Graceful stop 77 ms and fully functional; kill 46 ms and broken. |
-| C3 txpool overflow | 1,600 accepted submissions, 192 mined: acceptance is not retention. |
+| C3 txpool overflow | 1,600 accepted, 192 mined after 12 s. Root cause confirmed: the RPC layer swallows "pool full" rejections and a local tracker retries them once a minute (+64 mined per minute). With `--txpool.nolocals` the client gets 1,472 explicit errors. |
 | C4 changed flags | `--cache` free, `--gcmode archive` silently accepted, `--state.scheme` mismatch refused. |
 | C5 reorg | `debug_setHead` and `lab_fork` both look like REWIND then REORG depth 3. |
 | C6 RPC abuse | Batch, body, slow-client and response limits all held. |
-| C7 disk / memory pressure | Not run (not safe on this machine). |
+| C7 memory pressure | A 700 MB-capped node is fine under load (peak ~135 MB); 3 concurrent `debug_traceCall` endless loops crash it (713 to 729 MB, out of memory), the crashed process sometimes stays alive without answering (3 of 5 runs), and the restart hits the C1 wedge. Disk-full analysed from source only. |
 
 ## Tests
 
 ```bash
 go vet ./...                                              # clean
-go test ./...                                             # 18 fast unit tests, no node needed
+go test ./...                                             # 22 fast unit tests, no node needed
 go test -tags e2e -count=1 ./test/e2e                     # 1 end-to-end test: starts labnode (about 5 s)
-go test -tags chaos -count=1 -v -timeout 20m ./test/chaos # 6 scenarios / 12 tests, real processes (about 6 minutes)
+go test -tags chaos -count=1 -v -timeout 30m ./test/chaos # C1 to C7 plus C3b, real processes (about 15 minutes; C7 is Windows only)
 ```
 
-CI definition: [.github/workflows/ci.yml](.github/workflows/ci.yml) (**never run on a runner**; the commands in it were run by hand).
+CI: [ci.yml](.github/workflows/ci.yml) (vet, gofmt, build, unit tests, e2e on Linux) on every push; [chaos.yml](.github/workflows/chaos.yml) runs the chaos suite on Linux weekly and on demand (see PLAN.md for its result).
 
 ## Honest limits
 
 * Windows 10 + Git Bash is the only environment the code was run on. The OS-specific code (process control, Ctrl-Break) has Unix counterparts that are untested.
-* `monitoring/` (Prometheus, Grafana, alert rules) is untested: no Docker on the author's machine. Metric names and the scrape path are verified.
+* Prometheus, Grafana and the alert rules were verified natively through their APIs, not visually (no browser was available). The Docker Compose variant in `monitoring/` is untested.
 * Timings come from one 8 GB laptop with other work running. They are indicative.
 * A process kill is not a power cut; the C1/C2 findings are about `kill -9`.
-* No licence has been chosen for this repository yet. go-ethereum is LGPL-3.0 (library) / GPL-3.0 (`cmd/`).
+* MIT licence ([LICENSE](LICENSE)) for this repository's own code. It uses go-ethereum (LGPL-3.0 library, GPL-3.0 `cmd/`) as a dependency; check their terms before redistributing binaries.
 
 ## Documentation map
 
 [PLAN.md](PLAN.md) status and deviations - [docs/NODE-OPS.md](docs/NODE-OPS.md) flags and startup - [docs/RUNBOOK.md](docs/RUNBOOK.md) operate and recover -
-[docs/METRICS.md](docs/METRICS.md) metric catalogue - [docs/geth-code-tour.md](docs/geth-code-tour.md) source tour - [docs/postmortems/](docs/postmortems/README.md) -
+[docs/METRICS.md](docs/METRICS.md) metric catalogue - [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) Prometheus and Grafana - [docs/upstream/](docs/upstream/README.md) go-ethereum #28222 study - [docs/geth-code-tour.md](docs/geth-code-tour.md) source tour - [docs/postmortems/](docs/postmortems/README.md) -
 [docs/DEMO.md](docs/DEMO.md) - [docs/CONTRIBUTIONS.md](docs/CONTRIBUTIONS.md) - [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md) - [CLAUDE.md](CLAUDE.md) conventions.

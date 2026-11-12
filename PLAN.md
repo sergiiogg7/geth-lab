@@ -11,6 +11,7 @@ nothing posted externally (the contribution track is research and documentation 
 |---|---|
 | 2026-11-12 | Plan written for Geth/Go (client, language and shape changed from the Besu/Java plan). |
 | 2026-11-12 | Built autonomously to a demonstrable state in one session; status table and deviations below. |
+| 2026-11-12 | Second pass: observability verified natively, C3 root cause confirmed, C7 memory cap run, chaos workflow, upstream study, licence. See the status rows below. |
 
 ## 1. Goal and scope
 
@@ -50,11 +51,11 @@ mainnet or testnet operation; production hardening; anything posted to GitHub.
 | 0 | Toolchain and spikes | `geth` 1.17.10 built; flags verified with `--help`; metrics endpoint scraped; `docs/TOOLCHAIN.md` | **done** |
 | 1 | Node ops | start/stop/kill/reset scripts; smoke test passes against geth and labnode; `docs/NODE-OPS.md` | **done** (smoke run on both) |
 | 2 | Go tools | `loadgen`, `labnode` (`lab_*` + tracer), `watch` build and are tested | **done**: 18 unit tests + 1 e2e test |
-| 3 | Observability | real metric names in `docs/METRICS.md`; Prometheus/Grafana/alerts files; local status page | **done**, with the Docker part **untested** |
-| 4 | Chaos scenarios | C1..C6 automated, passing, each with a postmortem built from recorded numbers | **done** (C7 not run, reasons in the C6 file) |
+| 3 | Observability | real metric names in `docs/METRICS.md`; Prometheus/Grafana/alerts run and proven through APIs | **done** natively (Prometheus 3.16.0, Grafana 13.3.1; `docs/OBSERVABILITY.md`); 4 alerts driven to firing; Docker Compose still **untested** |
+| 4 | Chaos scenarios | C1..C7 automated, each with a postmortem built from recorded numbers | **done**: C3 root cause confirmed (C3b), C7 memory cap run (Windows only); disk-full analysed, not reproduced |
 | 5 | Code tour | `docs/geth-code-tour.md` with verified anchors | **done** |
-| 6 | Contribution track | rules recorded, 3 to 5 verified open candidates, fallback repos | **done** (research only; nothing posted) |
-| 7 | Demo and docs | `scripts/demo.sh` run for real; README, RUNBOOK, SECURITY, CLAUDE, CI file | **done**; CI workflow never run on a runner |
+| 6 | Contribution track | rules recorded, verified open candidates, fallback repos | **done** (research only; `docs/upstream/` studies #28222 read-only; nothing posted, no PR code built) |
+| 7 | Demo and docs | demo run for real; README, RUNBOOK, SECURITY, CLAUDE, CI | **done**; CI green on push; chaos workflow added (result below) |
 | 8 | Owner study and decisions | read the tour and postmortems; decide on the follow-ups in section 6 | **not started (owner)** |
 
 ## 5. Deviations from the brief and from the old plan
@@ -62,13 +63,13 @@ mainnet or testnet operation; production hardening; anything posted to GitHub.
 | Deviation | Why |
 |---|---|
 | Single node instead of a multi-node network. | Geth has no multi-node Clique; a PoS devnet needs Docker (not available). Stated in the brief. |
-| C7 (disk/memory pressure) not run. | Not safely reproducible on this machine; documented, with a next step. |
-| Prometheus/Grafana/alerts untested. | No Docker. Only names and scrape path verified. |
+| C7 disk-full not reproduced. | Memory cap was run safely (Job Object, 700 MB); filling a disk can damage the shared system drive. Analysis only. |
+| Prometheus/Grafana verified through APIs only. | No browser for screenshots; Docker Compose path untested. |
 | `nodectl` helper binary added. | A bash script cannot send Ctrl-C to a background Windows process; broadcasting to the shared console interrupted the calling shell too, so the node gets a private console. |
 | Chaos tests live in Go with a build tag instead of bash scripts. | Easier to assert on numbers and to reuse `loadgen`; `scripts/chaos.sh` wraps them. |
 | `lab_fork` keeps the old branch as a side chain; `debug_setHead` deletes it. | Both end up as REWIND then REORG for a follower (C5). Documented rather than hidden. |
-| Hypotheses were wrong several times (C1, C2, C3, C5). | Recorded as such in the postmortems. C3's root cause is partly unverified and says so. |
-| No licence file. | The owner has not chosen one; go-ethereum is LGPL/GPL. |
+| Hypotheses were wrong several times (C1, C2, C3, C5, C7-B). | Recorded as such in the postmortems. C3's first root cause (silent eviction) was wrong and was corrected by C3b. |
+| MIT licence added by the autonomous pass. | A default choice, flagged for the owner to confirm. |
 | No `git commit` was made; `git init` only. | Rule. |
 
 ## 6. Risks, known issues and next steps (for the owner)
@@ -76,10 +77,11 @@ mainnet or testnet operation; production hardening; anything posted to GitHub.
 | Item | Detail |
 |---|---|
 | Version sensitivity | Findings describe v1.17.10. Two open upstream PRs (#36037, #35567) may change the C1 behaviour; re-run `scripts/chaos.sh C1` against them. |
-| Windows-only runs | Linux/macOS paths (SIGINT, `Setsid`) are written but untested. |
-| C3 root cause | Mechanism (eviction in `LegacyPool.add`) established from code and counters; why no submission was rejected as underpriced is open. |
+| Linux runs | Linux paths are exercised by `.github/workflows/ci.yml` (unit + e2e) and `chaos.yml` (chaos suite); the chaos result is in the report below and in the Actions tab. C7 skips on Linux (no cgroup counterpart yet). |
+| C3 root cause | Confirmed (local-transaction tracker, C3b). Open: why the retry yield is 64 per minute (suspected `--txpool.globalslots`); split of `txpool_valid`. |
+| Pending items | C7 hang explanation (candidate: exit path needs memory), disk-full on a disposable volume, committed-memory alert relative to a limit, Linux memory cap, running the `docs/upstream/REPRODUCTION-RECIPE.md` against a PR branch, deciding whether to post `DRAFT-comment-28222.md`. |
 | Timings | One 8 GB laptop with other work running. |
-| Next steps needing the owner's go | (1) commit and push; (2) choose a licence; (3) upstream follow-ups listed in `docs/CONTRIBUTIONS.md` section 2; (4) run Prometheus/Grafana on a Docker-capable machine and fix what breaks; (5) run the CI workflow. |
+| Next steps needing the owner's go | (1) confirm the MIT licence; (2) no tags or releases were made, decide on a first release; (3) upstream follow-ups listed in `docs/CONTRIBUTIONS.md` section 2; (4) optionally test the Docker Compose path on a Docker machine. |
 | Study order | `docs/geth-code-tour.md`, then `docs/postmortems/C1`, then the Go code: `internal/chainwatch`, `internal/labapi`, `cmd/labnode`, `internal/loadgen`. |
 
 ## 7. Definition of done (for this autonomous pass)
