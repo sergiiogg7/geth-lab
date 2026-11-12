@@ -1,5 +1,6 @@
 # Alert rules for a geth node. Metric names come from a real scrape (docs/METRICS.md).
-# UNTESTED against a running Prometheus (no Docker here); `promtool check rules` was not run.
+# Verified natively against Prometheus 3.16.0 (scripts/observability-up.sh, promtool check rules, obscheck);
+# GethDown was driven through pending -> firing by stopping the node (docs/OBSERVABILITY.md).
 # Each alert maps to a section of docs/RUNBOOK.md.
 groups:
   - name: geth
@@ -73,10 +74,11 @@ groups:
           runbook: "docs/RUNBOOK.md#alert-memoryhigh"
 
       - alert: NoPeers
-        # Not applicable to --dev (it has no networking). Enable for a real network node.
-        expr: p2p_peers == 0
+        # A --dev node has no networking, so the rule would sit in "pending" forever there (seen in the native run).
+        # Instances whose label starts with "dev-" (see prometheus.yml) are excluded; real-network nodes are not.
+        expr: p2p_peers{instance!~"dev-.*"} == 0
         for: 10m
         labels: {severity: warning}
         annotations:
-          summary: "no peers (ignore on a --dev node)"
+          summary: "no peers"
           runbook: "docs/RUNBOOK.md#alert-nopeers"
