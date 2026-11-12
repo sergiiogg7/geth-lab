@@ -11,7 +11,7 @@ history. No version has been tagged or released; entries are grouped by the date
 - `docs/OBSERVABILITY.md` with real API output and four alerts driven to `firing` by controlled failures (`docs/evidence/`).
 - C3b test (`test/chaos/c3b_locals_test.go`) that confirms the root cause of C3.
 - C7 memory-cap scenario and postmortem; `internal/nodeproc.LimitMemory` (Windows Job Object), `nodectl start -mem-mb`, `start-node.sh --mem-limit-mb`.
-- `.github/workflows/chaos.yml`: the chaos suite on Linux, weekly and on demand.
+- `.github/workflows/chaos.yml`: the chaos suite on Linux, weekly and on demand (first run green, C1 wedge reproduced on Linux).
 - `docs/upstream/`: read-only study of go-ethereum #28222 and its open PRs, a reproduction recipe (not run) and a draft comment (not posted).
 - MIT `LICENSE`, CI/licence badges, repository description and topics.
 

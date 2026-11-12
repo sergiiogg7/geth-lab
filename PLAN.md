@@ -77,7 +77,7 @@ mainnet or testnet operation; production hardening; anything posted to GitHub.
 | Item | Detail |
 |---|---|
 | Version sensitivity | Findings describe v1.17.10. Two open upstream PRs (#36037, #35567) may change the C1 behaviour; re-run `scripts/chaos.sh C1` against them. |
-| Linux runs | Linux paths are exercised by `.github/workflows/ci.yml` (unit + e2e) and `chaos.yml` (chaos suite); the chaos result is in the report below and in the Actions tab. C7 skips on Linux (no cgroup counterpart yet). |
+| Linux runs | Linux paths are exercised by `.github/workflows/ci.yml` (unit + e2e) and `chaos.yml` (chaos suite); chaos run 43274596212 on ubuntu-24.04 passed (about 12.5 minutes, all scenarios PASS, C7 SKIP) and reproduced the C1 wedge and the C3b numbers. C7 skips on Linux (no cgroup counterpart yet). |
 | C3 root cause | Confirmed (local-transaction tracker, C3b). Open: why the retry yield is 64 per minute (suspected `--txpool.globalslots`); split of `txpool_valid`. |
 | Pending items | C7 hang explanation (candidate: exit path needs memory), disk-full on a disposable volume, committed-memory alert relative to a limit, Linux memory cap, running the `docs/upstream/REPRODUCTION-RECIPE.md` against a PR branch, deciding whether to post `DRAFT-comment-28222.md`. |
 | Timings | One 8 GB laptop with other work running. |

@@ -86,7 +86,7 @@ CI: [ci.yml](.github/workflows/ci.yml) (vet, gofmt, build, unit tests, e2e on Li
 
 ## Honest limits
 
-* Windows 10 + Git Bash is the only environment the code was run on. The OS-specific code (process control, Ctrl-Break) has Unix counterparts that are untested.
+* The scenarios were written and first run on Windows 10 + Git Bash. The chaos suite also passed on an Ubuntu 24.04 GitHub runner (run 43274596212, 12.5 minutes; C7 skipped there): the C1 wedge (head 0 after restart, second transaction never mined) and the C3b numbers (1,472 underpriced errors with `--txpool.nolocals`, 384 mined after 230 s by default) reproduced exactly. macOS was not run.
 * Prometheus, Grafana and the alert rules were verified natively through their APIs, not visually (no browser was available). The Docker Compose variant in `monitoring/` is untested.
 * Timings come from one 8 GB laptop with other work running. They are indicative.
 * A process kill is not a power cut; the C1/C2 findings are about `kill -9`.
