@@ -1,0 +1,189 @@
+{
+  "date": "2026-11-12T17:29:39Z",
+  "default.accepted": 1600,
+  "default.attempted": 1600,
+  "default.errors": {},
+  "default.includedAtDrainEnd": 192,
+  "default.includedAtEnd": 384,
+  "default.metricsDelta": {
+    "txpool_overflowed": 0,
+    "txpool_pending_ratelimit": 64,
+    "txpool_queued_ratelimit": 0,
+    "txpool_underpriced": 2816,
+    "txpool_valid": 272
+  },
+  "default.timeline": [
+    {
+      "seconds": 0,
+      "included": 192,
+      "pending": 0,
+      "txpoolLocal": 1472
+    },
+    {
+      "seconds": 10,
+      "included": 192,
+      "pending": 0,
+      "txpoolLocal": 1472
+    },
+    {
+      "seconds": 20,
+      "included": 192,
+      "pending": 0,
+      "txpoolLocal": 1472
+    },
+    {
+      "seconds": 30,
+      "included": 192,
+      "pending": 0,
+      "txpoolLocal": 1472
+    },
+    {
+      "seconds": 40,
+      "included": 192,
+      "pending": 0,
+      "txpoolLocal": 1472
+    },
+    {
+      "seconds": 50,
+      "included": 192,
+      "pending": 0,
+      "txpoolLocal": 1472
+    },
+    {
+      "seconds": 60,
+      "included": 256,
+      "pending": 0,
+      "txpoolLocal": 1408
+    },
+    {
+      "seconds": 70,
+      "included": 256,
+      "pending": 0,
+      "txpoolLocal": 1408
+    },
+    {
+      "seconds": 80,
+      "included": 256,
+      "pending": 0,
+      "txpoolLocal": 1408
+    },
+    {
+      "seconds": 90,
+      "included": 256,
+      "pending": 0,
+      "txpoolLocal": 1408
+    },
+    {
+      "seconds": 100,
+      "included": 256,
+      "pending": 0,
+      "txpoolLocal": 1408
+    },
+    {
+      "seconds": 110,
+      "included": 256,
+      "pending": 0,
+      "txpoolLocal": 1408
+    },
+    {
+      "seconds": 120,
+      "included": 320,
+      "pending": 0,
+      "txpoolLocal": 1344
+    },
+    {
+      "seconds": 130,
+      "included": 320,
+      "pending": 0,
+      "txpoolLocal": 1344
+    },
+    {
+      "seconds": 140,
+      "included": 320,
+      "pending": 0,
+      "txpoolLocal": 1344
+    },
+    {
+      "seconds": 150,
+      "included": 320,
+      "pending": 0,
+      "txpoolLocal": 1344
+    },
+    {
+      "seconds": 160,
+      "included": 320,
+      "pending": 0,
+      "txpoolLocal": 1344
+    },
+    {
+      "seconds": 170,
+      "included": 320,
+      "pending": 0,
+      "txpoolLocal": 1344
+    },
+    {
+      "seconds": 180,
+      "included": 384,
+      "pending": 0,
+      "txpoolLocal": 1280
+    },
+    {
+      "seconds": 190,
+      "included": 384,
+      "pending": 0,
+      "txpoolLocal": 1280
+    },
+    {
+      "seconds": 200,
+      "included": 384,
+      "pending": 0,
+      "txpoolLocal": 1280
+    },
+    {
+      "seconds": 210,
+      "included": 384,
+      "pending": 0,
+      "txpoolLocal": 1280
+    },
+    {
+      "seconds": 220,
+      "included": 384,
+      "pending": 0,
+      "txpoolLocal": 1280
+    },
+    {
+      "seconds": 230,
+      "included": 384,
+      "pending": 0,
+      "txpoolLocal": 1280
+    }
+  ],
+  "default.txpool_local_gauge": 1472,
+  "default.watchedSeconds": 230,
+  "nolocals.accepted": 128,
+  "nolocals.attempted": 1600,
+  "nolocals.errors": {
+    "underpriced": 1472
+  },
+  "nolocals.includedAtDrainEnd": 128,
+  "nolocals.includedAtEnd": 128,
+  "nolocals.metricsDelta": {
+    "txpool_overflowed": 0,
+    "txpool_pending_ratelimit": 0,
+    "txpool_queued_ratelimit": 0,
+    "txpool_underpriced": 1472,
+    "txpool_valid": 144
+  },
+  "nolocals.timeline": [
+    {
+      "seconds": 0,
+      "included": 128,
+      "pending": 0,
+      "txpoolLocal": 0
+    }
+  ],
+  "nolocals.txpool_local_gauge": 0,
+  "nolocals.watchedSeconds": 0,
+  "os": "windows",
+  "scenario": "C3b-local-tracker"
+}

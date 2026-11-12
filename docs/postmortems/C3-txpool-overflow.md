@@ -1,31 +1,41 @@
 # C3: transaction flood beyond the txpool limits
 
-Date: 2026-11-12. Test: `test/chaos/c3_txpool_test.go`. Data: `out/chaos/C3-txpool-overflow.json`. Node: stock
-`geth 1.17.10 --dev --dev.period 4 --txpool.globalslots 64 --txpool.globalqueue 64 --txpool.accountslots 16 --txpool.accountqueue 16`,
+Date: 2026-11-12 (first run, rewritten the same day after a second experiment). Tests: `test/chaos/c3_txpool_test.go` (the flood) and
+`test/chaos/c3b_locals_test.go` (the experiment that explains it). Data: `out/chaos/C3-txpool-overflow.json`, `out/chaos/C3b-local-tracker.json`
+(copy in `docs/evidence/`). Node: stock `geth 1.17.10 --dev --dev.period 4 --txpool.globalslots 64 --txpool.globalqueue 64 --txpool.accountslots 16 --txpool.accountqueue 16`,
 in-memory chain, metrics on. Windows 10.
 
 ## Summary
 
-With tiny pool limits and slow blocks, a client can submit transactions that the node **accepts (returns a hash) and later
-discards without telling anyone**. In phase 1, 1,600 submissions all succeeded at the RPC level (zero errors), but only 192 were ever
-mined; the pool was empty at the end. The only trace is the pool counters (`txpool_underpriced` rose by 2,816 in that phase).
-Replacements behave as documented: an identical resend is "already known", a replacement with less than a 10% bump is
-"replacement transaction underpriced", a bump of 20% replaces.
+With tiny pool limits and slow blocks, a client submitted 1,600 transactions, every `eth_sendRawTransaction` returned a hash, and only 192 were mined by the end of the
+12-second drain. **Root cause (confirmed by experiment): this is not a silent eviction. The pool rejected 1,472 of them with `ErrUnderpriced`, and Geth's RPC layer
+deliberately swallowed that error.** `EthAPIBackend.SendTx` treats "pool full" style rejections as *temporary*, returns success to the client and hands the transaction to the
+**local-transaction tracker**, which re-submits whatever the pool does not hold, once at 10 s and then **once per minute**. The transactions are not lost, they are queued in the tracker
+and trickle back in: with these limits 64 more were mined per minute (192 -> 256 -> 320 -> 384 over 230 s), so at that rate the 1,408 stragglers would need about 22 minutes (extrapolation, not measured to the end). With `--txpool.nolocals`
+the same flood is answered with 1,472 explicit `transaction underpriced` errors and every accepted transaction is mined.
 
-## Setup and hypothesis
+My first write-up of this scenario said the pool "accepts, then evicts silently". **That was wrong** (the counter `txpool_underpriced` made it look like evictions, and the
+fact that no client error was seen made it look like acceptance). The corrected mechanism is below; the original numbers all stand.
 
-Three phases on one node, each a `loadgen` run with its own senders:
+## Setup and hypotheses
+
+Three phases on one node, each a `loadgen` run with its own senders (C3), then a targeted experiment (C3b):
 
 | Phase | Load | Purpose |
 |---|---|---|
 | P1 steady flood | 16 senders, 1,600 transactions, unthrottled, blocks every 4 s | overflow the pool |
 | P2 nonce gaps | 8 senders, 320 transactions, every 3rd transaction skips a nonce that is never sent | fill the queued set |
 | P3 replacements | 4 senders, 40 nonces, each sent four times: original, identical, +1 wei, +20% | price-bump rules |
+| C3b default | the P1 flood again, then watch mined count, pool and the `txpool_local` gauge for 230 s | does the node deliver the "lost" transactions later? |
+| C3b `--txpool.nolocals` | the P1 flood again | what does the client see without the tracker? |
 
-Hypothesis before the run: the pool never exceeds its limits; excess transactions are rejected at submission with explicit errors
-(`txpool is full`, `transaction underpriced`); gaps stay queued and are not mined; replacement needs a 10% bump.
+Hypothesis 1 (before the first run): the pool never exceeds its limits and excess transactions are rejected at submission with explicit errors. **Half wrong:** limits held, but no
+error reached the client.
 
-## Observed
+Hypothesis 2 (written into `c3b_locals_test.go` before it ran, after reading the v1.17.10 source): `SendTx` swallows temporary rejections and the tracker re-submits them every
+minute; with `--txpool.nolocals` the tracker is not created and the client gets errors. **Confirmed on every point.**
+
+## Observed (C3, first run)
 
 | | P1 steady | P2 gaps | P3 replace |
 |---|---|---|---|
@@ -33,59 +43,69 @@ Hypothesis before the run: the pool never exceeds its limits; excess transaction
 | Errors returned to the client | **none** | **none** | `already-known` 40, `replacement-underpriced` 40 |
 | Mined (included) | **192** | 0 | 40 |
 | Max pending / max queued seen | 128 / 0 | 24 / 64 | 40 / 63 |
-| Final pending / queued | 0 / 0 | 24 / 64 | 0 / 63 |
 | `txpool_valid` delta | 272 | 328 | 84 |
-| Discard counters (delta) | `txpool_underpriced` **2,816**, `txpool_pending_ratelimit` 64 | `txpool_queued_ratelimit` **232** | `txpool_known` 40, `txpool_pending_discard` 40 (the replaced originals) |
+| Discard counters (delta) | `txpool_underpriced` **2,816**, `txpool_pending_ratelimit` 64 | `txpool_queued_ratelimit` **232** | `txpool_known` 40, `txpool_pending_discard` 40 |
 
-Reading the numbers:
+## Observed (C3b, the experiment)
 
-* P1: 1,600 accepted, 192 mined = 3 blocks x 64 pending slots (one block every 4 s during the 12 s drain). The remaining 1,408 accepted
-  transactions are neither mined nor pending at the end (final pending 0): they were evicted after being accepted.
-* P2: 320 accepted, but only 24 pending + 64 queued = 88 remain; 232 were dropped from the queue (`txpool_queued_ratelimit` 232). The
-  queue holds exactly `--txpool.globalqueue 64`. Nothing is mined because pending transactions wait for the next 4 s block and the
-  run ends after 2 s.
-* P3: of 160 submissions, 40 originals were accepted, 40 identical resends were rejected, 40 `+1 wei` replacements rejected, 40 `+20%`
-  replacements accepted. 40 mined. The `63` queued left over are from P2's senders (the pool is shared).
+| | default (tracker on) | `--txpool.nolocals` |
+|---|---|---|
+| Attempted / accepted at RPC | 1,600 / **1,600** | 1,600 / **128** |
+| Errors seen by the client | none | `underpriced` **1,472** |
+| Mined at the end of the 12 s drain | 192 | 128 |
+| `txpool_underpriced` delta | 2,816 (identical to C3: the run reproduced) | 1,472 |
+| `txpool_valid` delta | 272 (identical to C3) | 144 |
+| `txpool_local` gauge | 1,472 | **0** |
+| Mined after 60 / 120 / 180 / 230 s | 256 / 320 / 384 / 384 | no change (nothing left to deliver) |
+| `txpool_local` after 60 / 120 / 180 s | 1,408 / 1,344 / 1,280 | 0 |
 
-Hypothesis verdict: pool size limit held (max pending 128, i.e. up to 2x `globalslots` transiently, never unbounded), but the
-**"explicit rejection at submission" part was wrong**: overflow is silent.
+The steps happen exactly at the 60 s marks of the watch (the tracker's one-minute timer), 64 transactions each (equal to `--txpool.globalslots 64`; I did not verify that this is why).
+A manual run of the same flood with Prometheus attached (`docs/evidence/alert-txpool-dropping.txt`) showed `txpool_local` = 1,600 right after the flood and falling to 1,472 and 1,408 as
+transactions were mined: the node *tracks* what it told the client it accepted.
 
-## Root cause
+## Root cause (v1.17.10 source, line numbers are for that tag)
 
-The code path is `LegacyPool.add` (`core/txpool/legacypool/legacypool.go:660`), lines 700 to 759. When the pool is full
-(`all.Slots() + new > GlobalSlots + GlobalQueue`, line 701):
+1. `eth/api_backend.go:361-381 SendTx`: `err := txPool.Add(tx)`. If `localTxTracker == nil` the error goes back to the client. Otherwise: if the error is **not** a "temporary reject"
+   it goes back; if it **is**, the transaction is passed to `localTxTracker.Track(tx)` and the function returns `nil`.
+2. `core/txpool/locals/errors.go:29 IsTemporaryReject` lists `txpool.ErrUnderpriced`, `legacypool.ErrTxPoolOverflow`, `ErrFutureReplacePending`, `ErrInflightTxLimitReached`,
+   `ErrOutOfOrderTxFromDelegated`, `ErrAuthorityReserved`.
+3. When the pool is full, `LegacyPool.add` (`core/txpool/legacypool/legacypool.go:700-707`) returns `ErrUnderpriced` for a new transaction that is not better than the cheapest one in the pool.
+   `pricedList.Underpriced` (`list.go:596-616`) uses `h.cmp(worst, tx) >= 0`, so a transaction **with the same price as the worst one is underpriced**. All 16 senders paid the same
+   1 gwei tip, so once the pool was full everything after it was "underpriced". This also answers the open question of the first write-up (why no submission was *rejected* as
+   underpriced: they were, the error never left the node).
+4. `core/txpool/locals/tx_tracker.go:36 recheckInterval = time.Minute`, `:213` first check after 10 s: the tracker asks the pool whether it still has each tracked transaction and calls
+   `pool.Add(resubmits)` for the rest. That is the 64-per-minute trickle. It also explains the counter: `txpool_underpriced` 2,816 = the 1,472 first-pass rejections plus the roughly
+   1,344 transactions the 10-second recheck tried again and the pool rejected again (1,472 + 1,344 = 2,816; the 1,344 is my arithmetic from `txpool_local` 1,472 minus the 128 already mined, not a separate measurement).
+   `txpool_underpriced` therefore counts **rejection attempts including tracker retries**, not evicted transactions.
+5. `eth/backend.go:341`: the tracker exists only if `!config.TxPool.NoLocals`. With `--txpool.nolocals` step 1 returns the real error. The flag's help text says only "Disables price exemptions
+   for locally submitted transactions", which does not mention that it also changes what the client is told.
 
-1. if the new transaction is not better than the cheapest one in the pool (`priced.Underpriced`, line 703), it is **rejected** with
-   `ErrUnderpriced` and the client sees an error;
-2. otherwise the pool makes room by **evicting the cheapest existing transactions** (`priced.Discard`, line 720; removal at
-   line 755) and each eviction is counted with `underpricedTxMeter.Mark(1)` (line 752) and logged only at Trace level (line 751).
-   The sender of an evicted transaction already holds its hash; nobody tells it.
-
-The measured `txpool_underpriced` delta of 2,816 in P1 is that line-752 counter, i.e. evictions of already-accepted transactions. Later
-cleanup in `truncatePending` (`:1431`) and `truncateQueue` (`:1511`) produces the `ratelimit` counters (64 and 232). That no submission
-received `ErrUnderpriced` in P1 means every new transaction compared as *better* than the cheapest queued one, although all
-senders used the same 1 gwei tip. The loadgen refreshes its fee cap from the current base fee every 500 ms, so a price drift between
-submissions is the likely reason, but this was **not verified** (action item 3).
+Not established: whether the 64-per-minute rate is exactly `globalslots`; the exact split of the 272 `txpool_valid` between first pass and rechecks; behaviour with
+`--txpool.rejournal` / `--txpool.journal` changes. P2's `txpool_queued_ratelimit` 232 was not re-analysed here; it comes from `truncateQueue`, a different path (a queue cut after acceptance).
 
 ## Impact
 
-* A client that treats "hash returned" as "will be mined" can lose transactions under load without any error. It must poll for the
-  receipt, with a timeout and resubmission, or track `txpool_*` discard counters on the node it uses.
-* Per-account limits (16 executable, 16 queued here; 16 and 64 by default) make a single busy sender hit `ratelimit` long before the
-  global limit.
-* The queued set is a cheap place to park junk: 64 gapped transactions filled the whole queue in P2.
+* "Hash returned" means "the node took responsibility" for locally submitted transactions, not "the pool holds it". Under overload the delivery is delayed by **minutes**, at a rate set by
+  the pool limits, and the client sees no error and no hint. A client with its own timeout (typical: 1 to 2 minutes) will resubmit with a higher fee, which is an unnecessary replacement
+  race, or conclude the transaction is lost.
+* The node's memory and journal grow with the number of tracked transactions (`txpool_local`, journal file `transactions.rlp`).
+* In a multi-tenant deployment (a public RPC endpoint) every client is "local" to that node: the behaviour is a property of RPC submission, not of who the sender is.
+* Per-account limits make a single busy sender hit `ratelimit` long before the global limit; the queued set is a cheap place to park junk (P2: 64 gapped transactions filled the queue).
 
 ## Action items
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Alert `TxPoolDroppingTransactions` on `increase(txpool_underpriced[5m]) > 0 or increase(txpool_overflowed[5m]) > 0`. | in `monitoring/prometheus/alerts.yml` (untested) |
-| 2 | Loadgen reports `acceptedButNotIncluded`, which is the number that exposes this behaviour. | done |
-| 3 | Find out why no P1 submission was rejected as underpriced (log fee caps per submission, run with identical fixed fee caps) before relying on this explanation upstream. | open |
-| 4 | Candidate docs note for `--txpool.*` / `eth_sendRawTransaction`: "accepted does not mean retained". | proposed in `docs/CONTRIBUTIONS.md` section 3; needs the owner's go |
-| 5 | Repeat with `--txpool.nolocals` and with fixed identical fee caps to see whether submissions are rejected instead of evicted later. | open |
+| 1 | Alert `TxPoolDroppingTransactions` on `increase(txpool_underpriced[5m]) > 0 or increase(txpool_overflowed[5m]) > 0`. | **verified firing** on a real flood in 13 s (`docs/evidence/alert-txpool-dropping.txt`) |
+| 2 | Add `txpool_local` to the dashboard and runbook: a growing gauge with an empty pool means the tracker is holding transactions the pool refused. | in `docs/METRICS.md` and `docs/RUNBOOK.md`; not on the dashboard yet |
+| 3 | Loadgen reports `acceptedButNotIncluded`, the number that exposes this. | done |
+| 4 | Operators who want back-pressure instead of silent queuing: run with `--txpool.nolocals` (clients get `transaction underpriced`) or size `--txpool.globalslots/globalqueue` for the expected burst. | documented; tested (C3b) |
+| 5 | Candidate upstream docs note: the `--txpool.nolocals` help text and the `eth_sendRawTransaction` documentation should say that a successful return can mean "queued in the local tracker". Not filed; needs the owner's go (`docs/CONTRIBUTIONS.md` section 3). | proposed |
+| 6 | Explain the 64-per-minute rate (read `pool.Add` batch handling, run with `--txpool.globalslots 128`, expect 128 per minute). | open, cheap |
 
 ## Reproduce
 
-`scripts/chaos.sh C3`. By hand: `scripts/start-node.sh --period 4 -- --txpool.globalslots 64 --txpool.globalqueue 64 --txpool.accountslots 16 --txpool.accountqueue 16`,
-then `bin/loadgen -senders 16 -txs 1600` and `bin/loadgen -scenario gap -gap-every 3 -senders 8 -txs 320`, then `bin/loadgen -scenario replace -senders 4 -txs 40`.
+`scripts/chaos.sh C3` (first run) and `go test -tags chaos -count=1 -v -timeout 20m -run TestC3b ./test/chaos` (about 4.5 minutes). By hand:
+`scripts/start-node.sh --period 4 -- --txpool.globalslots 64 --txpool.globalqueue 64 --txpool.accountslots 16 --txpool.accountqueue 16`, then
+`bin/loadgen -senders 16 -txs 1600 -drain 12s`, and watch `curl -s 127.0.0.1:6060/debug/metrics/prometheus | grep -E '^txpool_(local|underpriced)'`.
+For the contrast, add `-- --txpool.nolocals` to the start command.

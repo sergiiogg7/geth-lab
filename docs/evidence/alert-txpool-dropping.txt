@@ -1,0 +1,23 @@
+# Controlled failure 4: txpool flood (C3 settings), alert TxPoolDroppingTransactions
+# date: 2026-11-12T17:26:26Z
+17:26:26  alert TxPoolDroppingTransactions: ? -> inactive
+17:26:39  alert TxPoolDroppingTransactions: inactive -> firing
+attempted=1600 accepted=1600 included=128 acceptedButNotIncluded=1472
+txpool: max pending=128 max queued=0 | final pending=0 queued=0
+# GET /api/v1/alerts
+{"status":"success","data":{"alerts":[{"labels":{"alertname":"HeadWentBackwards","instance":"dev-node","job":"geth","severity":"critical"},"annotations":{"runbook":"docs/RUNBOOK.md#alert-headwentbackwards","summary":"block head is lower than it was within the last 5 minutes (rewind)"},"state":"firing","activeAt":"2026-11-12T17:26:34.813147797Z","value":"-4.5e+01"},{"labels":{"alertname":"TxPoolDroppingTransactions","instance":"dev-node","job":"geth","severity":"warning"},"annotations":{"runbook":"docs/RUNBOOK.md#alert-txpooldroppingtransactions","summary":"pool is discarding transactions (see C3 postmortem: accepted txs can vanish silently)"},"state":"firing","activeAt":"2026-11-12T17:26:39.813147797Z","value":"3.0346752000000006e+03"}]}}
+# txpool_underpriced
+"value":[1794504422.214,"2944"]
+# txpool_local
+"value":[1794504422.240,"1600"]
+# increase(txpool_underpriced[5m])
+"value":[1794504422.268,"2979.8761931034483"]
+
+# Manual follow-up on the same node: tracker gauge txpool_local, pool and head every 20 s (all 1600 accepted, 128 mined at the end of the flood)
+17:27:06 txpool_local=1600 pool pending=0 queued=0 head=11
+17:27:27 txpool_local=1600 pool pending=0 queued=0 head=16
+17:27:47 txpool_local=1472 pool pending=0 queued=0 head=21
+17:28:07 txpool_local=1472 pool pending=0 queued=0 head=26
+17:28:28 txpool_local=1472 pool pending=0 queued=0 head=31
+17:28:48 txpool_local=1408 pool pending=0 queued=0 head=36
+# Reading: the node tracks all 1600 submissions (txpool_local), and the tracker count falls as transactions are mined (1600 -> 1472 -> 1408): the "lost" transactions are re-submitted in the background (see docs/postmortems/C3-txpool-overflow.md).
