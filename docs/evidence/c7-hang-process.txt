@@ -1,0 +1,4 @@
+# C7 hang evidence, captured by hand during run 3 (2026-11-12 ~17:46 local), node pid 2596 after 'fatal error: out of memory' (VirtualAlloc errno=1455)
+wmic: ThreadCount=1 WorkingSetSize=2772992 PageFileUsage=716800 (KB)
+netstat: 127.0.0.1:18703 and :16703 still LISTENING by pid 2596; client sockets in CLOSE_WAIT
+curl -m 4 to RPC and to the HTTP port: no response (http=000, 4.0 s timeout)
