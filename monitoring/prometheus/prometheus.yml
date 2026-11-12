@@ -1,0 +1,19 @@
+# UNTESTED HERE: Docker is not available on the author's machine. The scrape path and
+# metric names were verified against a real geth 1.17.10 node (docs/METRICS.md);
+# the Prometheus/Grafana containers themselves were never started.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: geth
+    metrics_path: /debug/metrics/prometheus   # geth's exposition path (scripts/start-node.sh: --metrics.port 6060)
+    static_configs:
+      # host.docker.internal reaches the host from Docker Desktop; on Linux use the host IP
+      # or `network_mode: host` and 127.0.0.1.
+      - targets: ["host.docker.internal:6060"]
+        labels:
+          instance: dev-node

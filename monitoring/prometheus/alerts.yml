@@ -1,0 +1,82 @@
+# Alert rules for a geth node. Metric names come from a real scrape (docs/METRICS.md).
+# UNTESTED against a running Prometheus (no Docker here); `promtool check rules` was not run.
+# Each alert maps to a section of docs/RUNBOOK.md.
+groups:
+  - name: geth
+    rules:
+      - alert: GethDown
+        expr: up{job="geth"} == 0
+        for: 30s
+        labels: {severity: critical}
+        annotations:
+          summary: "geth metrics endpoint is down"
+          runbook: "docs/RUNBOOK.md#alert-gethdown"
+
+      - alert: NoNewBlocks
+        # Only meaningful with --dev.period N (a dev node without a period only seals blocks when a tx arrives).
+        expr: changes(chain_head_block[2m]) == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "head block did not move for 2 minutes"
+          runbook: "docs/RUNBOOK.md#alert-nonewblocks"
+
+      - alert: HeadStateBehindHeader
+        # After an unclean shutdown geth keeps the header chain but rewinds the block head (see C1 postmortem).
+        expr: chain_head_header - chain_head_block > 3
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "header head is ahead of the block head by more than 3"
+          runbook: "docs/RUNBOOK.md#alert-headstatebehindheader"
+
+      - alert: TxPoolBacklog
+        # default --txpool.globalslots is 5120
+        expr: txpool_pending > 4000
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "more than 4000 executable transactions waiting"
+          runbook: "docs/RUNBOOK.md#alert-txpoolbacklog"
+
+      - alert: TxPoolDroppingTransactions
+        # txpool_underpriced / txpool_overflowed only ever increase even though geth types them "gauge".
+        expr: increase(txpool_underpriced[5m]) > 0 or increase(txpool_overflowed[5m]) > 0
+        for: 0m
+        labels: {severity: warning}
+        annotations:
+          summary: "pool is discarding transactions (see C3 postmortem: accepted txs can vanish silently)"
+          runbook: "docs/RUNBOOK.md#alert-txpooldroppingtransactions"
+
+      - alert: ChainReorg
+        expr: increase(chain_reorg_drop[10m]) > 0
+        for: 0m
+        labels: {severity: warning}
+        annotations:
+          summary: "blocks were dropped from the canonical chain"
+          runbook: "docs/RUNBOOK.md#alert-chainreorg"
+
+      - alert: RpcErrorRatioHigh
+        expr: rate(rpc_failure[5m]) / clamp_min(rate(rpc_requests[5m]), 1e-9) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "more than 10% of JSON-RPC requests fail"
+          runbook: "docs/RUNBOOK.md#alert-rpcerrorratiohigh"
+
+      - alert: MemoryHigh
+        expr: system_memory_used > 2e9
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "geth process uses more than 2 GB"
+          runbook: "docs/RUNBOOK.md#alert-memoryhigh"
+
+      - alert: NoPeers
+        # Not applicable to --dev (it has no networking). Enable for a real network node.
+        expr: p2p_peers == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "no peers (ignore on a --dev node)"
+          runbook: "docs/RUNBOOK.md#alert-nopeers"

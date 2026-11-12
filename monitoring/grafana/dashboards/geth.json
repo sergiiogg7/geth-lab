@@ -1,0 +1,38 @@
+{
+  "title": "geth-lab: node overview (untested, no Docker on the author machine)",
+  "uid": "geth-lab-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {"from": "now-15m", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "stat", "title": "Head block", "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+     "targets": [{"expr": "chain_head_block", "datasource": {"type": "prometheus", "uid": "prometheus"}}]},
+    {"id": 2, "type": "timeseries", "title": "Head block vs header (gap after unclean shutdown)", "gridPos": {"x": 6, "y": 0, "w": 9, "h": 8},
+     "targets": [
+       {"expr": "chain_head_block", "legendFormat": "block", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "chain_head_header", "legendFormat": "header", "datasource": {"type": "prometheus", "uid": "prometheus"}}]},
+    {"id": 3, "type": "timeseries", "title": "TxPool pending / queued", "gridPos": {"x": 15, "y": 0, "w": 9, "h": 8},
+     "targets": [
+       {"expr": "txpool_pending", "legendFormat": "pending", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "txpool_queued", "legendFormat": "queued", "datasource": {"type": "prometheus", "uid": "prometheus"}}]},
+    {"id": 4, "type": "timeseries", "title": "TxPool discards (rate / s)", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+     "targets": [
+       {"expr": "rate(txpool_underpriced[1m])", "legendFormat": "underpriced", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "rate(txpool_overflowed[1m])", "legendFormat": "overflowed", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "rate(txpool_pending_ratelimit[1m])", "legendFormat": "pending ratelimit", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "rate(txpool_queued_ratelimit[1m])", "legendFormat": "queued ratelimit", "datasource": {"type": "prometheus", "uid": "prometheus"}}]},
+    {"id": 5, "type": "timeseries", "title": "Block insert time (chain_inserts, ns)", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+     "targets": [
+       {"expr": "chain_inserts{quantile=\"0.5\"}", "legendFormat": "p50", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "chain_inserts{quantile=\"0.99\"}", "legendFormat": "p99", "datasource": {"type": "prometheus", "uid": "prometheus"}}]},
+    {"id": 6, "type": "timeseries", "title": "JSON-RPC requests / failures (rate)", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+     "targets": [
+       {"expr": "rate(rpc_requests[1m])", "legendFormat": "requests", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "rate(rpc_failure[1m])", "legendFormat": "failures", "datasource": {"type": "prometheus", "uid": "prometheus"}}]},
+    {"id": 7, "type": "timeseries", "title": "Process memory (bytes)", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+     "targets": [
+       {"expr": "system_memory_used", "legendFormat": "used", "datasource": {"type": "prometheus", "uid": "prometheus"}},
+       {"expr": "system_memory_held", "legendFormat": "held", "datasource": {"type": "prometheus", "uid": "prometheus"}}]}
+  ]
+}

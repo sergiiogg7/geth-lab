@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: geth-lab
+    folder: geth-lab
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
