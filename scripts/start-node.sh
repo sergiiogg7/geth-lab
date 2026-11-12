@@ -5,6 +5,7 @@
 #   scripts/start-node.sh --persist          persistent datadir in .lab/datadir (survives restarts)
 #   scripts/start-node.sh --client labnode   use bin/labnode (geth + lab_ namespace + gasProfile tracer)
 #   scripts/start-node.sh --period 2         seal a block every 2 s (default 0: one block per tx)
+#   scripts/start-node.sh --mem-limit-mb 700 cap the node committed memory with a Windows Job Object (Windows only; see docs/postmortems/C7)
 #   scripts/start-node.sh -- <flags>         extra flags passed to the node, e.g. -- --txpool.globalslots 64
 #
 # Flags passed to geth (labnode understands the same names):
@@ -17,12 +18,13 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-PERSIST=0; CLIENT=geth; PERIOD=0; EXTRA=()
+PERSIST=0; CLIENT=geth; PERIOD=0; MEMMB=0; EXTRA=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --persist) PERSIST=1 ;;
     --client)  CLIENT="$2"; shift ;;
     --period)  PERIOD="$2"; shift ;;
+    --mem-limit-mb) MEMMB="$2"; shift ;;
     --) shift; EXTRA=("$@"); break ;;
     *) die "unknown option $1" ;;
   esac
@@ -50,7 +52,7 @@ if [ ${#EXTRA[@]} -gt 0 ]; then ARGS+=("${EXTRA[@]}"); fi
 say "starting $CLIENT: $BIN ${ARGS[*]}"
 : > "$LAB_LOGFILE"
 ensure_nodectl
-"$LAB_ROOT/bin/nodectl" start -log "$LAB_LOGFILE" -pid "$LAB_PIDFILE" -- "$BIN" "${ARGS[@]}" >/dev/null
+"$LAB_ROOT/bin/nodectl" start -mem-mb "$MEMMB" -log "$LAB_LOGFILE" -pid "$LAB_PIDFILE" -- "$BIN" "${ARGS[@]}" >/dev/null
 echo "$CLIENT" > "$LAB_CLIENTFILE"
 
 if secs="$(wait_rpc 60)"; then

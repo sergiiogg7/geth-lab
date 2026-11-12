@@ -1,7 +1,8 @@
 // Command nodectl starts, stops and probes the lab node process in a way that
 // works the same on Windows (Git Bash) and Unix.
 //
-//	nodectl start -log node.log -pid node.pid -- geth --dev ...   start detached, write the pid
+//	nodectl start [-mem-mb N] -log node.log -pid node.pid -- geth --dev ...   start detached, write the pid
+//	                                                              (-mem-mb: Windows Job Object cap on committed memory)
 //	nodectl stop  <pid> [seconds]                                 graceful stop (Ctrl-C equivalent)
 //	nodectl alive <pid>                                           exit 0 if the process exists
 //
@@ -20,6 +21,8 @@ import (
 	"os/exec"
 	"strconv"
 	"time"
+
+	"github.com/sergiiogg7/geth-lab/internal/nodeproc"
 )
 
 func main() {
@@ -79,6 +82,7 @@ func start(args []string) {
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
 	logPath := fs.String("log", "node.log", "append stdout+stderr here")
 	pidPath := fs.String("pid", "node.pid", "write the pid here")
+	memMB := fs.Int("mem-mb", 0, "cap the committed memory of the process (Windows Job Object); 0 = no cap")
 	_ = fs.Parse(args)
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -95,6 +99,14 @@ func start(args []string) {
 	if err := cmd.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, "nodectl:", err)
 		os.Exit(1)
+	}
+	if *memMB > 0 {
+		// No kill-on-close: nodectl exits right away and the node must keep running, capped.
+		if _, err := nodeproc.LimitMemory(cmd.Process.Pid, *memMB, false); err != nil {
+			_ = cmd.Process.Kill()
+			fmt.Fprintln(os.Stderr, "nodectl: memory limit not applied, process killed:", err)
+			os.Exit(1)
+		}
 	}
 	if err := os.WriteFile(*pidPath, []byte(strconv.Itoa(cmd.Process.Pid)), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, "nodectl:", err)

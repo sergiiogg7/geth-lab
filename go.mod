@@ -2,7 +2,10 @@ module github.com/sergiiogg7/geth-lab
 
 go 1.27.4
 
-require github.com/ethereum/go-ethereum v1.17.10
+require (
+	github.com/ethereum/go-ethereum v1.17.10
+	golang.org/x/sys v0.47.0
+)
 
 require (
 	github.com/DataDog/zstd v1.5.7 // indirect
@@ -92,7 +95,6 @@ require (
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect

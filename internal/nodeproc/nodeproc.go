@@ -31,6 +31,10 @@ type DevOpts struct {
 	TxPool      map[string]int
 	Verbosity   int
 	Extra       []string
+
+	// MemLimitMB, when > 0, puts the process in a Windows Job Object that caps its committed memory (see MemLimit).
+	// It is not a node flag: the node does not know it is capped. Start refuses to run the node if the cap cannot be applied.
+	MemLimitMB int
 }
 
 // Args renders the flags. TxPool keys are the suffix after "--txpool.".
@@ -76,9 +80,10 @@ type Proc struct {
 	cmd  *exec.Cmd
 	log  *os.File
 
-	done chan struct{} // closed when the process exits
-	mu   sync.Mutex
-	err  error // result of cmd.Wait
+	done  chan struct{} // closed when the process exits
+	limit *MemLimit     // nil unless Opts.MemLimitMB > 0
+	mu    sync.Mutex
+	err   error // result of cmd.Wait
 }
 
 // Start launches binary with the options and appends stdout+stderr to logPath.
@@ -95,6 +100,17 @@ func Start(binary string, opts DevOpts, logPath string) (*Proc, error) {
 		return nil, err
 	}
 	p := &Proc{Opts: opts, cmd: cmd, log: lf, done: make(chan struct{})}
+	if opts.MemLimitMB > 0 {
+		// Safety first: if the cap cannot be applied the node must not run at all (a capped test must never run uncapped).
+		lim, err := LimitMemory(cmd.Process.Pid, opts.MemLimitMB, true)
+		if err != nil {
+			_ = cmd.Process.Kill()
+			_, _ = cmd.Process.Wait()
+			lf.Close()
+			return nil, fmt.Errorf("memory limit: %w", err)
+		}
+		p.limit = lim
+	}
 	go func() {
 		err := cmd.Wait()
 		p.mu.Lock()
@@ -155,4 +171,27 @@ func (p *Proc) Err() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.err
+}
+
+// MemPeakBytes is the peak committed memory of the node, as measured by its Job Object (0 and false when no limit was set).
+// It stays readable after the process has exited.
+func (p *Proc) MemPeakBytes() (uint64, bool) {
+	if p.limit == nil {
+		return 0, false
+	}
+	b, err := p.limit.PeakBytes()
+	return b, err == nil
+}
+
+// Exited reports whether the process has ended, and its exit code (only meaningful when true).
+func (p *Proc) Exited() (bool, int) {
+	select {
+	case <-p.done:
+		if p.cmd.ProcessState != nil {
+			return true, p.cmd.ProcessState.ExitCode()
+		}
+		return true, -1
+	default:
+		return false, 0
+	}
 }

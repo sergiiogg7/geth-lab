@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the lab tools (loadgen, watch, labnode, nodectl) into ./bin
+# Build the lab tools (loadgen, watch, labnode, nodectl, obscheck) into ./bin
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 cd "$LAB_ROOT"
