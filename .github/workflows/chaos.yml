@@ -1,0 +1,32 @@
+# Chaos scenarios on a Linux runner. Heavy (real geth processes, about 10 minutes), so only on demand and weekly.
+# The scenarios were written and first run on Windows; this workflow is what exercises the Unix code paths
+# (SIGINT, SIGKILL, process groups) in internal/nodeproc.
+name: chaos
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"   # Mondays 03:17 UTC
+
+jobs:
+  chaos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: install geth (same version as go.mod)
+        run: |
+          go install github.com/ethereum/go-ethereum/cmd/geth@v1.17.10
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: chaos scenarios
+        run: go test -tags chaos -count=1 -v -timeout 35m ./test/chaos
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaos-observations
+          path: out/chaos/
+          retention-days: 30

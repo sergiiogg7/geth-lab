@@ -1,16 +1,9 @@
-# NOT RUN LOCALLY: written for GitHub Actions, never executed on a runner. The commands inside were run by hand
-# on the author's Windows machine (go vet, go test, the e2e test, the chaos suite); the workflow glue itself is untested.
 name: ci
 
 on:
   push:
   pull_request:
   workflow_dispatch:
-    inputs:
-      chaos:
-        description: "also run the chaos scenarios (about 6 minutes)"
-        type: boolean
-        default: false
 
 jobs:
   build-test:
@@ -23,6 +16,8 @@ jobs:
           cache: true
       - name: vet
         run: go vet ./...
+      - name: vet (build-tagged tests)
+        run: go vet -tags "e2e chaos" ./test/...
       - name: gofmt
         run: test -z "$(gofmt -l cmd internal test)"
       - name: build
@@ -42,25 +37,3 @@ jobs:
       - name: end-to-end test (starts labnode)
         run: go test -tags e2e -count=1 -v -timeout 10m ./test/e2e
 
-  chaos:
-    # Starts a real geth; heavy, so only on demand or on a schedule.
-    if: github.event_name == 'workflow_dispatch' && inputs.chaos
-    runs-on: ubuntu-24.04
-    needs: build-test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: install geth 1.17.10 and foundry
-        run: |
-          go install github.com/ethereum/go-ethereum/cmd/geth@v1.17.10
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - name: chaos scenarios
-        run: go test -tags chaos -count=1 -v -timeout 25m ./test/chaos
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: chaos-observations
-          path: out/chaos/
