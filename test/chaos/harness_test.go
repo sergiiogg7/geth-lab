@@ -223,7 +223,9 @@ func logPathFor(t *testing.T, label string) string {
 // scrapeMetrics reads the node's Prometheus endpoint and returns the samples
 // that have no labels (name -> value). Good enough for gauges and counters.
 func scrapeMetrics(port int) (map[string]float64, error) {
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/metrics/prometheus", port))
+	// A timeout is essential: a node that crashed in the middle of its exit (C7) keeps its listening socket but never answers.
+	hc := &http.Client{Timeout: 3 * time.Second}
+	resp, err := hc.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/metrics/prometheus", port))
 	if err != nil {
 		return nil, err
 	}
